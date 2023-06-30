@@ -1,0 +1,137 @@
+---
+title: "Ensemble Modeling"
+author: "Sergio Butkewitsch"
+date: "7/26/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Concepts
+
+![The Bias-Variance Trade-off](BiasVariance.png)
+
+### Parallel Ensembling Methods (Bagging)
+
+- Step 1: perform the bootstrapping, extracting S sub-samples **with replacement** out of N total available points. 
+
+- Step 2: fit S independent (weak) learners, utilizing each of the individual subsets obtained in Step 1.
+
+- Step 3: summarize the S independent (weak) learners into a combination, which is typically and average for predictive models whose output is a continuous random variable and either an average (soft combination) or a majority vote (hard combination) if the output is categorical.
+
+When performing Step 1, the goal is to generate as many subsets as possible, provided that each one is still large enough to allow for reasonable individual models to be produced, and at the same time minimizing the correlation (i.e., repetition of data that gets resampled with replacement) across samples. Certainly, satisfactory fulfilment of all these conflicting requirements depends upon a large enough N to start with.
+
+For Step 2, it is usual to choose each independent learner to be of the same type before they are “bootstrap aggregated” or “bagged” in Step 3. This homogeneity does not mean that the intended diversity of the ensembling is compromised, not only because each individual learner arises from a different (and ideally independent) data set, but also due to parameter choices that can add to achievement of this goal. For example, it is common to balance individual learners that overfit (residing at the right hand end of the spectrum in the Bias-Variance Trade-off) and underfit (residing at the left hand end of the spectrum in the Bias-Variance Trade-off) so that the resulting ensemble achieves the best balance. Moreover, it is also common practice to fit the individual weak learners with different feature sets (i.e., different versions of the matrix of independent variables [X]) so that additional diversity is obtained (this is the **Random Forest** algorithm). 
+
+Last but not least, the most important aspect of Step 3 is finding the optimal weighting strategy for each individual weak learner. The weights are decision variables for minimizing a suitable loss function, ideally out of an independent data set used exclusively for testing purposes.
+
+### Sequential Ensembling Methods (Boosting)
+
+Steps 1 and 2 for sequential ensembling occur as in the parallel methods, and the fundamental difference in Step 3 is that, instead of solving a single instance of weights optimization.
+
+Each iteration is updated from the previous one by adding a weighted contribution of one of the possible weak learners WM, such that the loss function is minimized. Because the addition of each further learner “boosts” the previous one(s), and this is done adaptively at each iteration, this approach is often referred to as “adaptive boosting” or “adaboost” for short.
+
+When the steepest descent optimization method is used to minimize the error, relying solely on information about the gradient of the loss function from any iteration to the next, the method is called gradient boosting (GBM, for short). It is assumed that the loss function is continuously differentiable and, when it incorporates regularization terms, the nomenclature **xgboost** (for “extreme gradient boosting) is applied.
+
+### Cross-Validation
+
+![Illustrating Cross-Validation](CrossValidation.png)
+
+## R implementation
+
+```{r}
+# Load libraries
+library(mlbench)
+library(caret)
+library(caretEnsemble)
+library(BDgraph)
+
+# Load the dataset
+data <- read.csv("DAA.csv")
+df <- read.csv("DAA.csv")
+dataset = df[seq(1, nrow(df), 6), ]
+names(dataset)[names(dataset) == 'Class'] <- 'Class'
+```
+
+```{r}
+head(dataset)
+```
+
+## Bagging/Bootsrap Based
+
+```{r}
+control <- trainControl(method="repeatedcv", number=10, repeats=3)
+seed <- 7
+metric <- "Accuracy"
+# Bagged CART
+set.seed(seed)
+fit.treebag <- train(ï..Attendance~., data=dataset, method="treebag", metric=metric, trControl=control)
+# Random Forest
+set.seed(seed)
+fit.rf <- train(ï..Attendance~., data=dataset, method="rf", metric=metric, trControl=control)
+# summarize results
+bagging_results <- resamples(list(treebag=fit.treebag, rf=fit.rf))
+summary(bagging_results)
+dotplot(bagging_results)
+```
+
+
+## Boosting/Sequential Error Tracking Based
+
+```{r}
+control <- trainControl(method="repeatedcv", number=10, repeats=3)
+seed <- 7
+metric <- "Accuracy"
+# C5.0
+set.seed(seed)
+fit.c50 <- train(ï..Attendance~., data=dataset, method="C5.0", metric=metric, trControl=control)
+# Stochastic Gradient Boosting
+set.seed(seed)
+fit.gbm <- train(ï..Attendance~., data=dataset, method="gbm", metric=metric, trControl=control, verbose=FALSE)
+# summarize results
+boosting_results <- resamples(list(c5.0=fit.c50, gbm=fit.gbm))
+summary(boosting_results)
+dotplot(boosting_results)
+```
+
+## Stacking/Combination Based
+
+```{r}
+control <- trainControl(method="repeatedcv", number=10, repeats=3, savePredictions=TRUE, classProbs=TRUE)
+algorithmList <- c('lda', 'rpart', 'glm', 'knn', 'svmRadial')
+set.seed(seed)
+models <- caretList(ï..Attendance~., data=dataset, trControl=control, methodList=algorithmList)
+results <- resamples(models)
+summary(results)
+dotplot(results)
+```
+
+## Stacking by Linear Combination of Individual Models
+
+```{r}
+# stack using glm
+stackControl <- trainControl(method="repeatedcv", number=10, repeats=3, savePredictions=TRUE, classProbs=TRUE)
+set.seed(seed)
+stack.glm <- caretStack(models, method="glm", metric="Accuracy", trControl=stackControl)
+print(stack.glm)
+```
+
+## Stacking by Non-linear Combination of Individual Models (Random Forest)
+
+```{r}
+# stack using random forest
+set.seed(seed)
+stack.rf <- caretStack(models, method="rf", metric="Accuracy", trControl=stackControl)
+print(stack.rf)
+```
+
+
+## Correlation Analysis for Stacking
+
+```{r}
+modelCor(results)
+```
+
+

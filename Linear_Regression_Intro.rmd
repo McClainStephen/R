@@ -1,0 +1,58 @@
+---
+title: "Linear Regression in R"
+author: "Sergio Butkewitsch"
+date: "7/24/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Let's import the same data used in the Excel step-by-step example
+
+```{r}
+setwd("C:\\Users\\sbut0\\Desktop\\Pitt_Katz_Teaching") # set your path accordingly
+library("readxl")
+fname   <- "least_sq_reg_001.xls"
+tabname <- "Linear_Regression"
+cells   <- "C12:G23"
+data    <- read_excel(fname, tabname, cells, col_names = FALSE)
+colnames(data) <- c("x1", "x2", "x1x2", "x2sq", "y")
+```
+
+## Now, let's fit the linear regression model ...
+
+```{r}
+lin_reg_model <- lm(y ~., data = data)
+```
+
+## ... which only makes sense after we explore it...
+
+```{r}
+str(lin_reg_model)
+```
+
+## ... one piece at a time
+
+```{r}
+summary(lin_reg_model)
+```
+
+## Finally, let's use the model to approximate predictions, which hopefully lead to decisions
+
+```{r}
+# Explicitly implementing the Dot Product Function
+x_new <- as.vector(c(1, 0.3, 1,  0.3, 1))
+coefs <- as.vector(lin_reg_model$coefficients)
+y_new <- x_new %*% coefs
+y_new
+class(y_new)
+# Using the built-in prediction method
+x_new <- data.frame(x_new = 1, 0.3, 1,  0.3, 1)
+colnames(x_new) <- c("AVG", "x1", "x2", "x1x2", "x2sq")
+y_new <- predict(lin_reg_model, newdata = x_new)
+y_new
+class(y_new)
+```
+

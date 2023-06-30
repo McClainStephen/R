@@ -1,0 +1,9 @@
+getwd()
+setwd("C:/Rdata")
+fourfactorsfe=read.csv("fourfactorsnba.csv")
+fourfactorsfe
+fourfactors.lm=lm(ORtg~eFG+TOVr+FTr+ORBr,data=fourfactorsfe)
+fourfactors.lm
+summary(fourfactors.lm)
+fourfactorsfe.lm=lm(ORtg~eFG+TOVr+FTr+ORBr+factor(WC),data=fourfactorsfe)
+summary(fourfactorsfe.lm)
